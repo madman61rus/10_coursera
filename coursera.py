@@ -1,6 +1,6 @@
 import requests
 import json
-from _datetime import datetime
+from datetime import datetime
 from lxml import etree
 import random
 from bs4 import BeautifulSoup
@@ -19,40 +19,48 @@ def get_course_info(course_slug):
     result_info['url'] = course_slug
     html = requests.get(course_slug)
     soup = BeautifulSoup(html.content,'html.parser')
-    result_info['title'] = soup.find('div',{'class':'title'}).contents[0]
-    result_info['language'] = soup.find('div',{'class':'language-info'}).contents[1]
+    if soup:
+        result_info['title'] = soup.find('div',{'class':'title'}).contents[0]
+        result_info['language'] = soup.find('div',{'class':'language-info'}).contents[1]
 
-    if  soup.find('div',{'class' : 'ratings-text bt3-visible-xs'}):
-        result_info['stars'] = soup.find('div',{'class' : 'ratings-text bt3-visible-xs'}).contents[0]
-    else:
-        result_info['stars'] = ''
-    try:
-        data_from_script = soup.select('script[type="application/ld+json"]')[0].text
-        data_json = json.loads(data_from_script)
-        startDate = data_json['hasCourseInstance'][0]['startDate']
-        endDate = data_json['hasCourseInstance'][0]['endDate']
-        startDt = datetime.strptime(startDate,'%Y-%m-%d')
-        endDt = datetime.strptime(endDate, '%Y-%m-%d')
-        weeks = (endDt - startDt).days // 7
-        result_info['start_date'] = startDate
-        result_info['weeks'] = weeks
-    except IndexError:
-        result_info['start_date'] = None
-
+        if  soup.find('div',{'class' : 'ratings-text bt3-visible-xs'}):
+            result_info['stars'] = soup.find('div',{'class' : 'ratings-text bt3-visible-xs'}).contents[0]
+        else:
+            result_info['stars'] = ''
+        try:
+            data_from_script = soup.select('script[type="application/ld+json"]')[0].text
+            data_json = json.loads(data_from_script)
+            startDate = data_json['hasCourseInstance'][0]['startDate']
+            endDate = data_json['hasCourseInstance'][0]['endDate']
+            startDt = datetime.strptime(startDate,'%Y-%m-%d')
+            endDt = datetime.strptime(endDate, '%Y-%m-%d')
+            weeks = (endDt - startDt).days // 7
+            result_info['start_date'] = startDate
+            result_info['weeks'] = weeks
+        except IndexError:
+            result_info['start_date'] = None
+            result_info['weeks'] = None
 
     return result_info
 
 
 def output_courses_info_to_xlsx(filepath,cources):
     wb = Workbook()
-    ws = wb.create_sheet(title="Courses")
-    dict = ['title', 'language', 'start_date','weeks','stars','url']
-    print(cources[0][dict[0]])
-    print(cources[0][dict[1]])
-    for row in range (1,20):
-        for col in range(1,6):
-            ws.cell(column=col, row=row, value=cources[row-1][dict[col-1]])
-        print (cources[row-1][dict[col-1]])
+    ws = wb.active
+    ws.cell(column=1, row=1,value='Title')
+    ws.cell(column=2, row=1, value='Language')
+    ws.cell(column=3, row=1, value='Start Date')
+    ws.cell(column=4, row=1, value='Weeks')
+    ws.cell(column=5, row=1, value='Stars')
+    ws.cell(column=6, row=1, value='Url')
+
+    for row in range (2,len(cources)+1):
+        ws.cell(column=1, row=row, value=cources[row - 1]['title'])
+        ws.cell(column=2, row=row, value=cources[row-1]['language'])
+        ws.cell(column=3, row=row, value=cources[row-1]['start_date'])
+        ws.cell(column=4, row=row, value=cources[row - 1]['weeks'])
+        ws.cell(column=5, row=row, value=cources[row - 1]['stars'])
+        ws.cell(column=6, row=row, value=cources[row - 1]['url'])
     wb.save(filename=filepath)
 
 
@@ -66,5 +74,5 @@ if __name__ == '__main__':
     for course in courses_list:
         courses_info_dict.append(get_course_info(course))
 
-    output_courses_info_to_xlsx('test.xslx',courses_info_dict)
+    output_courses_info_to_xlsx('test.xlsx',courses_info_dict)
 

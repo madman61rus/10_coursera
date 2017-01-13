@@ -1,78 +1,93 @@
 import requests
 import json
-from datetime import datetime
 from lxml import etree
 import random
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
+import argparse
 
-def get_courses_list():
-    courses_list = requests.get('https://www.coursera.org/sitemap~www~courses.xml')
+
+def get_courses_list(url, number_results):
+    courses_list = requests.get(url)
     courses_xml = etree.fromstring(courses_list.content)
-    courses_urls =  [child[0].text for child in courses_xml]
+    courses_urls = [child[0].text for child in courses_xml]
+    return random.sample(courses_urls, number_results)
 
-    return random.sample(courses_urls,20)
 
-
-def get_course_info(course_slug):
+def get_course_info(url):
     result_info = {}
-    result_info['url'] = course_slug
-    html = requests.get(course_slug)
-    soup = BeautifulSoup(html.content,'html.parser')
-    if soup:
-        result_info['title'] = soup.find('div',{'class':'title'}).contents[0]
-        result_info['language'] = soup.find('div',{'class':'language-info'}).contents[1]
-
-        if  soup.find('div',{'class' : 'ratings-text bt3-visible-xs'}):
-            result_info['stars'] = soup.find('div',{'class' : 'ratings-text bt3-visible-xs'}).contents[0]
-        else:
-            result_info['stars'] = ''
-        try:
-            data_from_script = soup.select('script[type="application/ld+json"]')[0].text
-            data_json = json.loads(data_from_script)
-            startDate = data_json['hasCourseInstance'][0]['startDate']
-            endDate = data_json['hasCourseInstance'][0]['endDate']
-            startDt = datetime.strptime(startDate,'%Y-%m-%d')
-            endDt = datetime.strptime(endDate, '%Y-%m-%d')
-            weeks = (endDt - startDt).days // 7
-            result_info['start_date'] = startDate
-            result_info['weeks'] = weeks
-        except IndexError:
-            result_info['start_date'] = None
-            result_info['weeks'] = None
-
-    return result_info
+    result_info['course_url'] = url
+    try:
+        course_html = requests.get(url)
+        soup = BeautifulSoup(course_html.content, 'html.parser')
+        result_info['title'] = get_courses_title(soup)
+        result_info['language'] = get_courses_language(soup)
+        result_info['start_date'] = get_courses_start(soup)
+        result_info['weeks'] = get_courses_weeks(soup)
+        result_info['stars'] = get_courses_stars(soup)
+        return (result_info)
+    except:
+        return None
 
 
-def output_courses_info_to_xlsx(filepath,cources):
+def get_courses_title(soup):
+    return soup.find('div', {'class': 'title'}).contents[0]
+
+
+def get_courses_language(soup):
+    return soup.find('div', {'class': 'language-info'}).contents[1]
+
+
+def get_courses_start(soup):
+    data_from_script = soup.select('script[type="application/ld+json"]')[0].text
+    data_json = json.loads(data_from_script)
+    start_date = data_json['hasCourseInstance'][0]['startDate']
+    if start_date:
+        return start_date
+    else:
+        return None
+
+
+def get_courses_weeks(soup):
+    return len(soup.find_all('div', {'class': 'week-heading body-2-text'}))
+
+
+def get_courses_stars(soup):
+    stars = soup.find('div', {'class': 'ratings-text bt3-visible-xs'}).contents[0]
+    return stars.replace('stars', '')
+
+
+def output_courses_info_to_xlsx(filepath, cources):
     wb = Workbook()
     ws = wb.active
-    ws.cell(column=1, row=1,value='Title')
-    ws.cell(column=2, row=1, value='Language')
-    ws.cell(column=3, row=1, value='Start Date')
-    ws.cell(column=4, row=1, value='Weeks')
-    ws.cell(column=5, row=1, value='Stars')
-    ws.cell(column=6, row=1, value='Url')
+    ws['A1'] = 'Title'
+    ws['B1'] = 'Language'
+    ws['C1'] = 'Start Date'
+    ws['D1'] = 'Weeks'
+    ws['E1'] = 'Stars'
+    ws['F1'] = 'Url'
 
-    for row in range (2,len(cources)+1):
-        ws.cell(column=1, row=row, value=cources[row - 1]['title'])
-        ws.cell(column=2, row=row, value=cources[row-1]['language'])
-        ws.cell(column=3, row=row, value=cources[row-1]['start_date'])
-        ws.cell(column=4, row=row, value=cources[row - 1]['weeks'])
-        ws.cell(column=5, row=row, value=cources[row - 1]['stars'])
-        ws.cell(column=6, row=row, value=cources[row - 1]['url'])
+    for counter, course_info in enumerate(cources):
+
+            ws.cell(row=counter + 2, column=1, value=course_info['title'])
+            ws.cell(row=counter + 2, column=2, value=course_info['language'])
+            ws.cell(row=counter + 2, column=3, value=course_info['start_date'])
+            ws.cell(row=counter + 2, column=4, value=course_info['weeks'])
+            ws.cell(row=counter + 2, column=5, value=course_info['stars'])
+            ws.cell(row=counter + 2, column=6, value=course_info['course_url'])
+
     wb.save(filename=filepath)
 
 
-
 if __name__ == '__main__':
-    courses_info_dict = []
+    args = argparse.ArgumentParser()
+    args.add_argument('-f', '--file', help='Файл для сохранения результатов', required=True)
+    args.add_argument('-r', '--results', help='Количество выводимых результатов')
+    arguments = args.parse_args()
 
-    courses_list = get_courses_list()
-    get_course_info(courses_list[0])
-
-    for course in courses_list:
-        courses_info_dict.append(get_course_info(course))
-
-    output_courses_info_to_xlsx('test.xlsx',courses_info_dict)
-
+    print('Получаем информацию с coursera.org...')
+    courses_urls = get_courses_list('https://www.coursera.org/sitemap~www~courses.xml', int(arguments.results))
+    print('Обрабатываем информацию ...')
+    courses_info = [get_course_info(url) for url in courses_urls if get_course_info(url)]
+    print('Сохраняем информацию в файл')
+    output_courses_info_to_xlsx(arguments.file, courses_info)

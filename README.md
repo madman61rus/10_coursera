@@ -1,7 +1,20 @@
 # Coursera Dump
 
-[TODO. There will be project description]
+Данная программа ищет и сохраняет в файл Exel список указанного
+количества курсов с сайта Coursera.org.
 
-# Project Goals
+### Пример использования
 
-The code is written for educational purposes. Training course for web-developers - [DEVMAN.org](https://devman.org)
+Файл, в который будет производится запись результатов, можно указать
+с помощью ключа -f или --file , а количество результатов с помощью
+ключа -r или --results
+
+Пример запуска
+
+```
+python coursera.py -f courses.xlsx -r 30
+```
+
+# Цели проекта
+
+Этот код написан в целях обучения. Курс для веб-разработчиков - [DEVMAN.org](https://devman.org)

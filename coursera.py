@@ -58,6 +58,7 @@ def get_courses_stars(soup):
     return stars.replace('stars', '')
 
 def prepare_output_courses(cources):
+
     wb = Workbook()
     ws = wb.active
     ws['A1'] = 'Title'
@@ -67,8 +68,7 @@ def prepare_output_courses(cources):
     ws['E1'] = 'Stars'
     ws['F1'] = 'Url'
 
-    for counter, course_info in enumerate(cources):
-        counter += 2
+    for counter, course_info in enumerate(cources,start=2):
         ws.cell(row=counter, column=1, value=course_info['title'])
         ws.cell(row=counter, column=2, value=course_info['language'])
         ws.cell(row=counter, column=3, value=course_info['start_date'])
